@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>WebGIS - Prakiraan cuaca BMKG</title>
+
+    <!--  Bootstrap CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css"
+        integrity="sha384-xOolHFLEh07PJGoPkLv1IbcEPTNtaed2xpHsD9ESMhqIYd0nLMwNLD69Npy4HI+N" crossorigin="anonymous">
+
+    <!--  google  -->
+    <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
+
+    <!-- Manual style  -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+    <style type="text/css">
+        body{
+            font-family: 'Roboto', sans-serif;
+        }
+        
+        #map {
+            height: 100vh;
+            width: 100%;
+        }
+
+        .navbar {
+            margin-inline: 50px;
+            height: 85px;
+            background-color: rgba(128, 128, 128, 0.9);
+        }
+
+        .navbar span{
+            color : white !important ;
+            font-weight: 300;
+
+        }
+        
+        
+    </style>
+</head>
+
+<body>
+    <!-- Navbar  -->
+    <nav class="navbar d-flex justify-content-between navbar-expand-md navbar-light fixed-top ">
+        <div class="container">
+            <a class="navbar-brand" href="#"><img src="assets\images\logo brand.png" width="40" height="40"
+                    class="d-inline-block align-center" alt=""><span class="navbar-brand mb-0 h1">WebGIS Indra Bayu</span></a>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <form class="form-inline ml-auto">
+                    <input class="form-control mr-sm-2" type="search" placeholder="Search" aria-label="Search">
+                    <button class="btn btn-lg btn-outline-info d-flex justify-content-center" type="submit" style="color: #ffff;"><i
+                            class="material-icons" style="font-size: 20px;">search</i></button>
+                </form>
+            </div>
+        </div>
+    </nav>
+
+
+    <!-- Map Leaflet -->
+    <div class="map" id="map"></div>
+
+</body>
+<!-- Make sure you put this AFTER Leaflet's CSS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+<script type="text/javascript">
+    // leaflet coordinate  system ([latitude, longitude], zoom) 
+    // var map = L.map('map').setView([51.507,  -0.09], 13);
+    let map = L.map('map').setView([-8.5264 , 117.5], 9);
+    // date time
+    let date = new Date();
+    let dateTime = date.getFullYear()+''+
+                    (date.getMonth()+1).toString().padStart(2,'0')+''+
+                    (date.getDate()).toString().padStart(2,'0')+''+
+                    date.getHours()+'00';
+    
+    let kodeCuaca ={
+            '0' : ['Cerah','clearskies'],
+            '1' : ['Cerah Berawan','partlycloudy'],
+            '2' : ['Cerah Berawan','partlycloudy'],
+            '3' : ['Berawan','mostlycloudy'],
+            '4' : ['Berawan Tebal','overcast'],
+            '5' : ['Udara Kabur','haze'],
+            '10' : ['Asap','smoke'],
+            '45' : ['Kabut','fog'],
+            '60' : ['Hujan Ringan','lightrain'],
+            '61' : ['Hujan Sedang','rain'],
+            '63' : ['Hujan Lebat','heavyrain'],
+            '80' : ['Hujan Lokal','isolatedshower'],
+            '95' : ['Hujan Petir','severethunderstorm'],
+            '97' : ['Hujan Petir','severethunderstorm'],
+    };
+    console.log(dateTime);
+    // API xml BMKG
+    let apiURL = 'https://data.bmkg.go.id/DataMKG/MEWS/DigitalForecast/DigitalForecast-NusaTenggaraBarat.xml';
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(map);
+
+    getData();
+    async function getData(){
+        let response = await fetch(apiURL);
+        let xmlString = await response.text();
+        let parse = new DOMParser();
+        let xmlData = parse.parseFromString(xmlString,'text/xml');
+        let areas = xmlData.querySelectorAll('area'); 
+        areas.forEach((area)=>{
+            let lat = area.getAttribute('latitude');
+            let lng = area.getAttribute('longitude');
+            let des = area.getAttribute('description');
+            let weathers = area.querySelectorAll('parameter[id="weather"] timerange');
+            let getTime = false;
+            let posPrakiraan;
+            //console.log(weathers);
+            weathers.forEach((weather,i)=>{
+                let getDateTime = weather.getAttribute('datetime');
+                if(getDateTime > dateTime && getTime == false){
+                    posPrakiraan = i;
+                    getTime = true;
+                }  
+            });
+            console.log(posPrakiraan);
+            //console.log(getDateTime);
+
+            let prakiraan = weathers[posPrakiraan].querySelector('value').textContent;
+            let iconURL = 'assets/images/icon/'+kodeCuaca[prakiraan][1]+'.png';
+            let deskripsi = kodeCuaca[prakiraan][0];
+            
+            let marker = L.marker([lat,lng],{
+                icon : L.icon({
+                    iconUrl: iconURL,
+                    iconSize: [50, 50],
+                    iconAnchor: [25, 25],
+                })
+            }).bindPopup('<strong>Wilayah : '+des+'</strong><br>Keterangan : '+deskripsi);
+            marker.addTo(map);
+            //console.log(weathers);
+        } )
+        
+    }
+</script>
+
+</html>
