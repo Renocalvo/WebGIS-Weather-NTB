@@ -22,10 +22,10 @@
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 
     <style type="text/css">
-        body{
+        body {
             font-family: 'Roboto', sans-serif;
         }
-        
+
         #map {
             height: 100vh;
             width: 100%;
@@ -37,13 +37,11 @@
             background-color: rgba(128, 128, 128, 0.9);
         }
 
-        .navbar span{
-            color : white !important ;
+        .navbar span {
+            color: white !important;
             font-weight: 300;
 
         }
-        
-        
     </style>
 </head>
 
@@ -52,12 +50,14 @@
     <nav class="navbar d-flex justify-content-between navbar-expand-md navbar-light fixed-top ">
         <div class="container">
             <a class="navbar-brand" href="#"><img src="assets\images\logo brand.png" width="40" height="40"
-                    class="d-inline-block align-center" alt=""><span class="navbar-brand mb-0 h1">WebGIS Indra Bayu</span></a>
+                    class="d-inline-block align-center" alt=""><span class="navbar-brand mb-0 h1">WebGIS Indra
+                    Bayu</span></a>
             <div class="collapse navbar-collapse" id="navbarNav">
-                <form class="form-inline ml-auto">
-                    <input class="form-control mr-sm-2" type="search" placeholder="Search" aria-label="Search">
-                    <button class="btn btn-lg btn-outline-info d-flex justify-content-center" type="submit" style="color: #ffff;"><i
-                            class="material-icons" style="font-size: 20px;">search</i></button>
+                <form class="form-inline ml-auto" id="searchForm">
+                    <input class="form-control mr-sm-2" id="searchInput" type="search" placeholder="Search"
+                        aria-label="Search">
+                    <button class="btn btn-lg btn-outline-info d-flex justify-content-center" type="submit"
+                        style="color: #ffff;"><i class="material-icons" style="font-size: 20px;">search</i></button>
                 </form>
             </div>
         </div>
@@ -75,29 +75,29 @@
 <script type="text/javascript">
     // leaflet coordinate  system ([latitude, longitude], zoom) 
     // var map = L.map('map').setView([51.507,  -0.09], 13);
-    let map = L.map('map').setView([-8.5264 , 117.5], 9);
+    let map = L.map('map').setView([-8.5264, 117.5], 9);
     // date time
     let date = new Date();
-    let dateTime = date.getFullYear()+''+
-                    (date.getMonth()+1).toString().padStart(2,'0')+''+
-                    (date.getDate()).toString().padStart(2,'0')+''+
-                    date.getHours()+'00';
-    
-    let kodeCuaca ={
-            '0' : ['Cerah','clearskies'],
-            '1' : ['Cerah Berawan','partlycloudy'],
-            '2' : ['Cerah Berawan','partlycloudy'],
-            '3' : ['Berawan','mostlycloudy'],
-            '4' : ['Berawan Tebal','overcast'],
-            '5' : ['Udara Kabur','haze'],
-            '10' : ['Asap','smoke'],
-            '45' : ['Kabut','fog'],
-            '60' : ['Hujan Ringan','lightrain'],
-            '61' : ['Hujan Sedang','rain'],
-            '63' : ['Hujan Lebat','heavyrain'],
-            '80' : ['Hujan Lokal','isolatedshower'],
-            '95' : ['Hujan Petir','severethunderstorm'],
-            '97' : ['Hujan Petir','severethunderstorm'],
+    let dateTime = date.getFullYear() + '' +
+        (date.getMonth() + 1).toString().padStart(2, '0') + '' +
+        (date.getDate()).toString().padStart(2, '0') + '' +
+        date.getHours() + '00';
+
+    let kodeCuaca = {
+        '0': ['Cerah', 'clearskies'],
+        '1': ['Cerah Berawan', 'partlycloudy'],
+        '2': ['Cerah Berawan', 'partlycloudy'],
+        '3': ['Berawan', 'mostlycloudy'],
+        '4': ['Berawan Tebal', 'overcast'],
+        '5': ['Udara Kabur', 'haze'],
+        '10': ['Asap', 'smoke'],
+        '45': ['Kabut', 'fog'],
+        '60': ['Hujan Ringan', 'lightrain'],
+        '61': ['Hujan Sedang', 'rain'],
+        '63': ['Hujan Lebat', 'heavyrain'],
+        '80': ['Hujan Lokal', 'isolatedshower'],
+        '95': ['Hujan Petir', 'severethunderstorm'],
+        '97': ['Hujan Petir', 'severethunderstorm'],
     };
     console.log(dateTime);
     // API xml BMKG
@@ -106,47 +106,103 @@
         attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
     }).addTo(map);
 
+    let weatherData = null; // variabel untuk menyimpan data cuaca
     getData();
-    async function getData(){
-        let response = await fetch(apiURL);
-        let xmlString = await response.text();
-        let parse = new DOMParser();
-        let xmlData = parse.parseFromString(xmlString,'text/xml');
-        let areas = xmlData.querySelectorAll('area'); 
-        areas.forEach((area)=>{
+
+
+    // Fungsi untuk mengambil data cuaca dari API
+    async function getData() {
+        try {
+            let response = await fetch(apiURL);
+            let xmlString = await response.text();
+            let parse = new DOMParser();
+            let xmlData = parse.parseFromString(xmlString, 'text/xml');
+            weatherData = xmlData.querySelectorAll('area'); // menyimpan data cuaca
+            processWeatherData(); // Memproses data cuaca setelah diambil
+        } catch (error) {
+            console.error('Error fetching data:', error);
+        }
+    }
+
+    // Fungsi untuk memproses data cuaca dan menambahkan marker ke peta
+    function processWeatherData() {
+        weatherData.forEach((area) => {
+            let des = area.getAttribute('description');
             let lat = area.getAttribute('latitude');
             let lng = area.getAttribute('longitude');
-            let des = area.getAttribute('description');
             let weathers = area.querySelectorAll('parameter[id="weather"] timerange');
-            let getTime = false;
             let posPrakiraan;
-            //console.log(weathers);
-            weathers.forEach((weather,i)=>{
+            let getTime = false;
+
+            weathers.forEach((weather, i) => {
                 let getDateTime = weather.getAttribute('datetime');
-                if(getDateTime > dateTime && getTime == false){
+                if (getDateTime > dateTime && !getTime) {
                     posPrakiraan = i;
                     getTime = true;
-                }  
+                }
             });
-            console.log(posPrakiraan);
-            //console.log(getDateTime);
 
             let prakiraan = weathers[posPrakiraan].querySelector('value').textContent;
-            let iconURL = 'assets/images/icon/'+kodeCuaca[prakiraan][1]+'.png';
+            let iconURL = 'assets/images/icon/' + kodeCuaca[prakiraan][1] + '.png';
             let deskripsi = kodeCuaca[prakiraan][0];
-            
-            let marker = L.marker([lat,lng],{
-                icon : L.icon({
+
+            let marker = L.marker([lat, lng], {
+                icon: L.icon({
                     iconUrl: iconURL,
                     iconSize: [50, 50],
                     iconAnchor: [25, 25],
                 })
-            }).bindPopup('<strong>Wilayah : '+des+'</strong><br>Keterangan : '+deskripsi);
+            }).bindPopup('<strong>Wilayah : ' + des + '</strong><br>Keterangan : ' + deskripsi);
             marker.addTo(map);
-            //console.log(weathers);
-        } )
-        
+        });
     }
+
+    // Fungsi untuk melakukan pencarian dengan data cuaca yang telah diambil
+    async function getDataAndSearch(searchInput) {
+        if (!weatherData) {
+            console.error('Data cuaca belum diambil');
+            return;
+        }
+
+        weatherData.forEach((area) => {
+            let des = area.getAttribute('description');
+            let lat = area.getAttribute('latitude');
+            let lng = area.getAttribute('longitude');
+            let weathers = area.querySelectorAll('parameter[id="weather"] timerange');
+            let posPrakiraan;
+            let getTime = false;
+
+            weathers.forEach((weather, i) => {
+                let getDateTime = weather.getAttribute('datetime');
+                if (getDateTime > dateTime && !getTime) {
+                    posPrakiraan = i;
+                    getTime = true;
+                }
+            });
+
+            if (des === searchInput) {
+                let prakiraan = weathers[posPrakiraan].querySelector('value').textContent;
+                let iconURL = 'assets/images/icon/' + kodeCuaca[prakiraan][1] + '.png';
+                let deskripsi = kodeCuaca[prakiraan][0];
+
+                let marker = L.marker([lat, lng], {
+                    icon: L.icon({
+                        iconUrl: iconURL,
+                        iconSize: [50, 50],
+                        iconAnchor: [25, 25],
+                    })
+                });
+                marker.bindPopup('<strong>Wilayah : ' + des + '</strong><br>Keterangan : ' + deskripsi)
+                    .openPopup();
+                marker.addTo(map);
+                map.setView([lat, lng], 12); // Set view to the searched area
+            }
+        });
+    }
+
+    // Pemanggilan fungsi dengan memberikan nama wilayah yang ingin dicari
+    //getDataAndSearch('Nama_Wilayah_Yang_Dicari');
 </script>
+<script src="search.js"></script>
 
 </html>
